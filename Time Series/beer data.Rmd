@@ -1,0 +1,133 @@
+---
+title: "Beer Production TimeSeries"
+author: "Group 1"
+date: "`r Sys.Date()`"
+output:
+  word_document: 
+    fig_width: 9
+    fig_height: 6
+  pdf_document: default
+  html_document: 
+    keep_md: yes
+---
+
+## Time Series
+This Time series assignment examines the beer production and fits a possible model to it.
+```{r setup, include=FALSE}
+## Set Chunk requirements
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+Loading the data and Required Packages
+```{r}
+library(astsa)
+library(readr)
+beerdata<-read_csv("beer.csv")
+```
+Converting the data into a time series
+```{r}
+beer<-ts(beerdata$`Monthly beer production`)
+plot(beer, type="b")
+```
+The beer data has both seasonality and an upward Trend. We will do both seasonal and non seasonal differences to remove seasonality.
+We will assume that the data exhibits a quarterly seasonality thus we will do a quarterly differencing.
+
+```{r}
+diff4<-diff(beer,4)
+plot(diff4, type="b")
+```
+
+```{r}
+diff1and4<-diff(diff4,1)
+diff1and4=diff1and4
+plot(diff1and4,type="b")
+```
+This plot represents the data that has both seasonal and non seasonal differencing components
+```{r}
+acf2(diff1and4,24)
+```
+Since the acf/pacf does not show clearly the type of the model the time series follows, so we will detrend the data
+
+```{r}
+detrend<-residuals(lm(diff4~time(diff4)))
+plot(detrend,type="b")
+```
+
+```{r}
+acf2(detrend)
+```
+From the early lags of both PACF and ACF, it is possible to say the model can have either non seasonal AR(1) or MA(1) terms.
+Taking a look at the lags at multiples of 4, there are significant spikes of the ACF especially lag1 and two. thus there is seasonal MA terms.
+So our model might have these components:
+1. Non-seasonal
+AR(1), MA(1), MA(2)
+2. Seasonal 
+MA(1), MA(2)
+
+The following are possible models:
+1. ARIMA(1,0,0)*(0,1,1)4
+2. ARIMA(0,0,1)*(0,1,1)4
+3. ARIMA(1,0,1)*(0,1,1)4
+4. ARIMA(1,0,0)*(0,1,2)4
+```{r}
+sarima(detrend,1,0,0,0,1,1,4)
+```
+
+```{r}
+sarima(detrend,0,0,1,0,1,1,4)
+```
+
+```{r}
+sarima(detrend,1,0,1,0,1,1,4)
+```
+```{r}
+sarima(detrend,1,0,0,0,1,2,4)
+```
+Of the four models above, their ACF plot for residual as well as other plots are have no much significant difference. However, looking closely into the AIC, BIC and Variance, we can conclude that the fourth model is the best since it has the lowest values.
+###Model 1
+AIC= 9.414
+BIC= 9.44
+Variance= 677.2
+###Model 2
+AIC= 9.46
+BIC= 9.496
+Variance= 709.5
+###Model 3
+AIC= 9.41
+BIC= 9.46
+Variance= 677.2
+###Model 4
+AIC= 8.55
+BIC= 8.6
+Variance= 267
+
+##Conclusion
+Below are the results for our fitted model:
+The p-values for all the coefficients of AR1, SMA1, and SMA2 are less than 0.05 indicating that they are all significant. 
+
+Coefficients:
+         ar1     sma1    sma2  constant
+      0.5545  -1.9695  0.9700   -0.0015
+s.e.  0.0414   0.0480  0.0471    0.0009
+
+sigma^2 estimated as 267:  log likelihood = -1997.87,  aic = 4005.74
+
+$degrees_of_freedom
+[1] 464
+
+$ttable
+         Estimate     SE  t.value p.value
+ar1        0.5545 0.0414  13.3882  0.0000
+sma1      -1.9695 0.0480 -40.9969  0.0000
+sma2       0.9700 0.0471  20.5943  0.0000
+constant  -0.0015 0.0009  -1.6161  0.1068
+
+The model is:
+X(t)= -0.0015 + 0.5545 Xt-1 - 1.9695 Wt-1  + 0.9700 Wt-2 + Wt
+
+## Forecasting
+Here we try and fore cast for the next four months
+```{r}
+sarima.for(detrend, 4,1,0,0,0,1,2,4)
+```
+

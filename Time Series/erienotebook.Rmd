@@ -1,0 +1,43 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+# The Lake Erie data (The series is n = 40 consecutive annual measurements of the level of Lake Erie in October)
+erie<-c(14.383, 14.649, 13.416, 14.288, 12.201, 14.307, 13.586, 14.592,
+        16.660, 15.332, 12.884, 12.296, 12.201, 10.873, 11.290, 12.049,
+        13.435, 14.137, 13.852, 14.213, 12.562, 14.801, 16.812, 15.427,
+        17.268, 15.427, 16.869, 15.712, 14.080, 15.408, 16.471, 17.268,
+        16.679, 17.116, 16.357, 15.863, 14.991, 13.776, 13.890, 15.787)
+erie_ts<-ts(erie)
+#erie
+```
+
+```{r}
+# A time series plot of the data is the following:
+plot(erie_ts,type="b")
+```
+
+```{r}
+library(astsa)
+# The ACF and the PACF of the series are the following. (They start at lag 1).
+acf2(erie_ts) # for graphing both the ACF and the PACF
+```
+
+```{r}
+sarima (erie_ts, 1, 0, 0) # this is the AR(1) model estimated with the author’s routine
+```
+
+
+```{r}
+sarima (erie_ts, 0, 0, 1) # this is the incorrect MA(1) model
+```
+
+```{r}
+sarima (erie_ts, 1, 0, 1) # this is the over-parameterized ARMA(1,1) model 
+```
+
+```{r}
+sarima.for(erie, 4, 1, 0, 0) # four forecasts from an AR(1) model for the erie data
+```
