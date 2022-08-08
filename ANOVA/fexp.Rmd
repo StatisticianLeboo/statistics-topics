@@ -1,0 +1,474 @@
+---
+title: "Untitled"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+# Introduction to Factorial Experiments
+This is the last section on my series of the various designs of experiments using R. These designs are what are commonly referred to as one factor at a time experiment.
+Make sure to read the previous post on CRD and RBD experiments.
+
+## What are Factorial Experiments?
+Many experiments involve the study of the effects of two or more factors. In general,
+factorial designs are most efficient for this type of experiment. By a factorial design, we
+mean that in each complete trial or replicate of the experiment all possible combinations of
+the levels of the factors are investigated. For example, if there are a levels of factor A and b levels of factor B, each replicate contains all ab treatment combinations. When factors are arranged in a factorial design, they are often said to be crossed.
+The effect of a factor is defined to be the change in response produced by a change in the level of the factor. This is frequently called a main effect because it refers to the primary factors of interest in the experiment. (Montgomery, 2012)
+factorial experiments allow us to analyze the effects of factors simultaneously. 
+The most common are the 2 factor factorials also known as the 2k experiments, where k can take the values (2,3,...).
+
+## Advantages of Factorial Experiments Over One Factor at a Time Experiments
+1. They are more efficient in that they provide more information at lower or similar cost as compared to one factor at a time experiments.
+2. Allows a researcher to study how the factors interact within themselves.
+
+## Disadvantages
+1. Some experiments may be cumbersome to compute mathematically especially if they involve numerous factors.
+2. Some information may be lost during the design of a factorial experiment. This is a phenomenon known as confounding.
+
+I will not get into the manual derivations of how to solve factorial experiments but, I will however attach some reference where one can get more information about it. 
+
+## Factorial Designs Using R
+To perform these experiments, we will use the [*DoeBioresearch*] (/https://cran.r-project.org/web/packages/doebioresearch/doebioresearch.pdf) package. Additionally, I have partnered with two friends of mine who are both microbiologists and have allowed me to use their experimental data for this illustration.
+
+## Example 1
+In this example, my friend [Joseah Lang'at] (/https://www.linkedin.com/in/joseah-langat-3286a2178/) was performing an experiment _SENSITIVITY OF *Staphylococcus aureus* AND *Escherichia coli* TO *Zingiber officinale* AND *Allium sativum* EXTRACTS_. In simpler terms, the title of the experiment was assessing how sensitive the two bacteria were to extracts of ginger and garlic.
+
+The main objectives of the experiment were;
+General Objectives
+To determine the sensitivity of *Staphylococcus aureus* and *Escherichia coli* to *Zingiber officinale* and *Allium sativum*.
+
+The data contained the following;
+Concentration. This represents levels of distilled water. (1,2,3) representing (0%, 50%, 25%) distilled water respectively. 
+Treatments. There are the plant extract; (Ginger, Garlic, Mixed and Control)
+Bacteria. There are two bacteria (Staphylococcus aureus denoted as Saureus and Escherichia coli denoted by Ecoli)
+Value. This is the zone of inhibition recorded in the experiment. The values are in centimeters.
+
+
+### Loading the data and required packages
+```{r}
+library(doebioresearch)
+library(readxl)
+sensitivity_data <- read_excel("SensitivityData.xlsx", 
+    sheet = "saureus")
+```
+
+### Viewing the data
+```{r}
+sensitivity_data
+```
+
+### Some Visualizations
+```{r}
+library(ggplot2)
+library(ggthemes)
+ggplot(sensitivity_data) +
+  aes(x = Treatment, y = Value, fill = Treatment) +
+  geom_boxplot(shape = "circle") +
+  scale_fill_hue(direction = 1) +
+  labs(title = "Box Plot for Treatments ") +
+  scale_fill_tableau()+
+  ggthemes::theme_fivethirtyeight() +
+  theme(plot.title = element_text(face = "bold.italic",hjust = 0.5))
+```
+
+```{r}
+library(ggpubr)
+ggplot(sensitivity_data) +
+  aes(x = Treatment, fill = Treatment, weight = Value) +
+  geom_bar() +
+  scale_fill_brewer(palette = "Set1", direction = 1) +
+  labs(y = "Yield",
+    title = "Total Yields for the Zone of Inhibition") +
+  ggthemes::theme_fivethirtyeight() +
+  theme(legend.position = "top") +
+  facet_wrap(vars(Bacteria))
+```
+
+```{r}
+ggplot(sensitivity_data) +
+  aes(x = Bacteria, y = Value, fill = Bacteria) +
+  geom_boxplot(shape = "circle") +
+  scale_fill_hue(direction = 1) +
+  labs(title = "Boxplot for the Bacteria") +
+  theme_minimal() +
+  scale_fill_tableau()+
+  theme(plot.title = element_text(face = "bold.italic",hjust = 0.5))
+```
+
+No presence of Outliers from the plots above.
+
+```{r}
+library(ggplot2)
+ggplot(sensitivity_data) +
+ aes(x = Bacteria, fill = Treatment, weight = Value) +
+ geom_bar(position = "dodge") +
+ scale_fill_hue(direction = 1) +
+ scale_y_continuous(n.breaks = 8)+
+ labs(y = "Yield", title = "Antimicrobial Yields", fill = "Plant Extract") +
+ theme_minimal() +
+ theme(plot.title = element_text(face = "bold", hjust = 0.5))
+```
+
+### Running a factorial experiment.
+*_Syntax_*
+
+*fcrd2fact(data, fact.A, fact.B, Multiple.comparison.test*
+
+Arguments
+_data_ - dependent variables. Note that you can use more than one dependent variable. Use the square brackets to extract the column range containing the dependent variable.
+
+_fact.A_ - vector containing levels of first factor
+
+_fact.B_ - vector containing levels of second factor
+
+_Multiple.comparison.test_ - 0 for no test, 1 for LSD test, 2 for Duncan test and 3 for HSD test
+
+To analyze the significance of the factors in the experiment, a 2^2 factorial experiment was chosen. This experiment was carried out at 5% level of significance. The Least Significant Difference was used to check on the of the differences between statistically significant groups.
+The two factors are Bacteria and Treatments. Concentration was taken as the blocking/replication factor.
+
+### Hypotheses
+1. Treatments (Factor A)
+Null: Anti-microbial activity between the treatments are equal.
+Alternative: At least one of the treatments has a different Anti-microbial activity
+
+2. Bacteria (Factor B)
+Null: *S.aureus* and *E.coli* have similar sensitivity effect on the extracts.
+Alternative: *S.aureus* and *E.coli* do not have similar sensitivity effect on the extracts.
+
+3. Blocks (Concetration of Distilled Water)
+Null: Blocks have similar effect
+Alternative: At least one is different
+
+*Decision Rule* If p-value is less than alpha(0.05) we reject the null hypothesis.
+
+```{r}
+frbd2fact(sensitivity_data[3], sensitivity_data$Concentration,
+                  sensitivity_data$Treatment,sensitivity_data$Bacteria,1)
+```
+
+### Result Interpretation
+1. ANOVA TABLE
+### Are the concentration (Block) significant?
+The test returned a p-value of (0.07741) for the blocks. This is greater than 0.05. The decision is therefore fail to reject the null hypothesis and conclude that with 95% confidence, the concentration effects of distilled water are statistically insignificant to the experimental yield.
+
+### Are the Effects of the Extracts Significant?
+A p-value of (2.167e-08) was returned by the test. This is  less than 0.05. The null hypothesis is rejected and conclude that with 95% confidence, that the effects of the plant extracts differ significantly.
+
+### Are the Effects of the Bacteria Significant?
+The p-value (9.299e-10) is less than 0.05. We therefore reject the null hypothesis and conclude that with 95% confidence, that the effects of the bacteria differ significantly.
+*Main effects are significant*
+
+### Are the Two-Factor Interaction Effects Significant?
+The p-value (9.299e-10) is less than 0.05. We therefore reject the null hypothesis and conclude that with 95% confidence, that the interaction effects are statistically significant.
+
+*R Square 0.971", indicates that this model explains 97.1% variability. This is a good result.*
+
+2. Comparison of Means
+Having rejected the null hypothesis in for main effects and interactions, the LSD test was used to test and select the effects with the most significance.
+
+### Treatments
+Of the 4 treatments, no statistical difference exists between Garlic and Mixed. These two offer the highest anti-microbial activity.
+When compared across the treatments, Garlic and Mixed differed significantly from ginger and control.
+
+### Bacteria
+*S.aureus* had the highest sensitivity as compared to *E.coli* with a mean of 1.708 as compared to 0.825 for *E.coli*.
+
+### Interaction Effects
+The interaction *Garlic:S.aureus* and *Mixed:S.aureus* offered the highest yield and there was no statistical differences between these interactions.
+
+In chronological order, the interaction effects were as follows;
+1. Garlic:Saureus	and Mixed:Saureus	
+2. Ginger:Saureus	
+3. Garlic:Ecoli		
+4. Mixed:Ecoli		
+5. Ginger:Ecoli		
+6. Control:Ecoli	
+7.Control:Saureus
+
+To conclude this experiment, an interaction plot was used to visualize the presecence of interaction between the two factors.
+
+### Checking for interaction within the data
+We use the *interaction.plot* function to check on interaction between the two factors; Bacteria and treatment
+```{r}
+interaction.plot(x.factor=sensitivity_data$Bacteria,
+                 trace.factor=sensitivity_data$Treatment,
+                 response=sensitivity_data$Value,
+                 type="b", 
+                 main="Interaction Between Bacteria and Plant Extracts",
+                 xlab="Bacteria",
+                 ylab = "Zone of Inhibition in cm",
+                 col = c("red","blue", "green", "black"),
+                 lwd=2,
+                 trace.label = "Extract") 
+```
+From the plot, Garlic has the highest antimicrobial activity followed by mixed then ginger and finally control.
+*S.aureus* has higher sensitivity as compared to *E.coli*.
+However, we can not conclude that there is presence of interaction between the two factors.
+Additionally, there is an increase in the sensitivity of the bacteria as you move from *E.coli* to *S.aureus*
+
+## Example 2
+In this example, my friend [Gideon] (/https://www.linkedin.com/in/steve-gideons-b390761a1/) was performing an experiment title _Prevalence of Bovine Mastitis and their Anti-microbial Susceptibility Profile in London Ward, Nakuru County_
+The objectives of the research were to determine the prevelence of mastitis, identify the most prevalent bacteria causing mastitis and determine their antimicrobial susceptibility profile.
+
+Bovine Mastitis is an inflammatory response of the udder tissue in mammary gland caused due to physical trauma or microorganism infections. It is considered the most common disease leading to economic loss in dairy industries due to reduced yield and poor quality of milk. (Henriques and Gomes, 2016)
+
+In summary, the research sought to investigate the most dominant bacteria that causes bovine mastitis and which type of mastitis diagnosis is the most prevalent. Finally, the research looked into some common antibiotics to understand which one was effective against what type of bovine mastitis. The study was conducted in London ward and a sample of 15 cows were randomly selected and milk samples drawn from them. Laboratory tests were performed and respective zone of inhibition recorded.
+
+### Loading the Data and some required packages
+```{r}
+library(readxl)
+library(dplyr)
+library(tidyr)
+library(knitr)
+library(ggplot2)
+library(ggthemes)
+Mastistis <- read_excel("MastitisData.xlsx", 
+    sheet = "Sheet1", col_types = c("text", 
+        "text", "text", "text", "text", "text", 
+        "numeric"))
+```
+
+The data contained the following variables;
+1. Specimen_No	
+2. Breed - Type of cow; Friesian, Jersey or Ayshire	
+3. Quarters - Cow's tits. Front Left (FL), Front Right, Back Left, Back Right	
+4. Isolates	- Bacteria identified
+5. Diagnosis - Type of mastitis	
+6. Sensitivity_test - Antibiotic administered	
+7. Yield - Zone of inhibition recorded in millimeters.
+
+### Some Exploratory Data Analysis
+Zone of Inhibition by Breed
+```{r}
+Breed_Summary<-Mastistis %>% 
+  group_by(Breed) %>%
+  drop_na() %>% 
+  summarise(Count=n(),
+            Average_Zone= mean(Yield),
+            SD=sd(Yield),
+            SE=SD/Count,
+            LCL=round(Average_Zone-(1.96*SE),2),
+            UCL=round(Average_Zone+(1.96*SE),2),
+            Zone_Mean_95Pct_CI=paste("(", LCL ," , ", UCL, ")" ))
+
+kable(Breed_Summary %>% 
+        select(-c(LCL,UCL, SE)))
+
+```
+
+### Aggregation by Isolates
+```{r}
+Isolate<-Mastistis %>% 
+  group_by(Isolates) %>% 
+  summarise(Count=n()) %>% 
+  mutate(Pct=(round(Count/sum(Count),2)*100),
+         Isolate_int=c("Ent","E.coli", "Klebsiella", "No_Isolate", "Pseudomonas",
+                       "Staphylococcus"),
+         Rate=paste0(Pct, "%"),
+         cumulative_ratio=cumsum(Pct),
+         ration_min=c(0, head(cumulative_ratio,n=-1)),
+         labelPosition=(cumulative_ratio+ration_min)/2,
+         label=paste0(Isolate_int, ":", Rate))
+
+ggplot(Isolate,aes(ymax=cumulative_ratio, ymin=ration_min, xmax=4, xmin=3, 
+                   fill=Isolate_int))+
+  geom_rect()+
+  scale_fill_manual(values = c(Ent = "red", 
+                               E.coli = "orange",
+                               Klebsiella= "green",
+                               No_Isolate = "blue",
+                               Pseudomona = "yellow",
+                               Staphylococcus= "purple"))+
+  geom_label(x=2.6,aes(y=labelPosition, label=label),size=6)+
+  coord_polar(theta="y")+
+  xlim(c(-1,4))+
+  labs(title="ISOLATES",
+       subtitle = ("Enterecoccus, E.coli, Klebsiella, No_Isolate, Pseudomonas,
+                       Staphylococcus"))+
+  theme(plot.title = element_text(face = "bold.italic",hjust = 0.5))+
+  theme_void()+
+  theme(legend.position = "none")
+
+```
+
+
+### Dropping values with No isolates
+```{r}
+no_isolate<-Mastistis %>% 
+  filter(Isolates=="No isolate")
+Mastistis_clean<-Mastistis[!Mastistis$Isolates=="No isolate",]
+
+Mastistis_clean <-Mastistis_clean %>% 
+  mutate(Breed=as.factor(Breed),
+         Quarters=as.factor(Quarters),
+         Isolates=as.factor(Isolates),
+         Diagnosis=as.factor(Diagnosis),
+         Yield=as.numeric(Yield))
+```
+
+### Cummulative Yields for the Zone of Inhibitions
+```{r}
+ggplot(Mastistis_clean) +
+  aes(x = Breed, y = Yield, fill = Isolates) +
+  geom_boxplot(shape = "circle") +
+  scale_fill_hue(direction = 1) +
+  labs(title = "Cummulative Yields for the Zone of Inhibitions") +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold.italic",hjust = 0.5)) +
+  facet_wrap(vars(Diagnosis))
+```
+
+### Analysis of Diagnosis and the Anti-microbial Agents
+To test for the significance in the mean differences, 3k factorial experiment was chosen.The Least Significant Difference was used to check on the of the differences between statistically significant groups.
+The three factors are Diagnosis, Sensitivity and Breed. Quarters was taken as the blocking/replication factor.
+
+*_Syntax_*
+_frbd3fact(data, replicationvector, fact.A, fact.B, fact.C,Multiple.comparison.test)_
+
+Arguments
+_data_ - dependent variables
+_replicationvector_ - vector containing replications
+_fact.A_ - vector containing levels of first factor
+_fact.B_ - vector containing levels of second factor
+_fact.C_ - vector containing levels of third factor
+_Multiple.comparison.test_ - 0 for no test, 1 for LSD test, 2 for Duncan test and 3 for HSD test
+
+
+### Hypotheses
+1. Diagnosis (Factor A)
+Null: The diagnosis are similar in effect.
+Alternative: At least one of the diagnosis has a different effect.
+
+2. Sensitivity (Factor B) These are the drugs subjected to the pathogens associated with mastitis.
+Null: The Sensitivity have similar effects.
+Alternative: At least one of the Sensitivity is different.
+
+3. Breed (Factor C) 
+Null: The breeds have similar effects.
+Alternative: At least one of the breeds is different.
+
+4. Blocks
+Null: Blocks have similar effect.
+Alternative: At least one is different.
+
+5. Interaction effects
+Null: Two and three factor interactions have similar effect.
+Alternative: At least one the interaction sets is different.
+
+*Decision rule* p-value criteria. If p-value is less than alpha (0.05), the null hypothesis is rejected.
+
+```{r}
+library(doebioresearch)
+frbd3fact(Mastistis_clean[7], Mastistis_clean$Quarters, Mastistis_clean$Diagnosis,
+          Mastistis_clean$Sensitivity_test, Mastistis_clean$Breed, 1)
+```
+
+### Interpretation of the ANOVA Results
+
+### Main Effects
+1. Blocks
+The test reported a p-value of (0.471279) for the Quarters. This is greater than alpha (0.05). 
+*Decision* 
+Fail to reject the null hypothesis.
+*Conclusion* 
+With 95% confidence, there exist sufficient statistical evidence to support the claim that the effects of the quarters are similar.
+
+2. Factor A - Diagnosis
+The test reported a p-value of (0.005388) for the diagnosis. This is less than alpha (0.05). 
+*Decision* 
+Reject the null hypothesis.
+*Conclusion* 
+With 95% confidence, there exist sufficient statistical evidence to deny the claim that the effects of the diagnosis are similar.
+The post hoc analyses showed that Coliform mastists had the highest effect with a mean prevalence of (20.05882). No statistical difference was found at 5% significance level between Staphylococcal mastitis and Pseudomonas mastitis.
+
+3. Factor B - Sensitivity
+The test reported a p-value of (1.366e-10) for the Sensitivity. This is less than alpha (0.05). 
+*Decision* 
+Reject the null hypothesis.
+*Conclusion* 
+With 95% confidence, there exist sufficient statistical evidence to deny the claim that the effects of the sensitivity are similar.
+The post hoc analyses showed that Gentamycin had the highest effect with a mean anti-microbial susceptibility of (23.31579). No statistical difference was found at 5% significance level between Neomycin and Cefalexin. Streptomycin, Tetracycline and Kanamycin had no statistical difference between them. Cotrimoxazole had the lowest anti-microbial susceptibility profile with mean (15.55263)	
+
+4. Factor C - Breed
+The test reported a p-value of (0.965412) for the breed. This is greater than alpha (0.05). 
+*Decision* 
+Fail to reject the null hypothesis.
+*Conclusion* 
+With 95% confidence, there exist sufficient statistical evidence to support the claim that the effects of the breed are similar. This implies that the dignosis was not dependent on the breed.
+
+### Interaction Effect
+1. fact.A:fact.B
+The two factor interaction for the diagnosis and sensitivity reported a p-value of (0.016189). This is less than alpha (0.05). 
+*Decision* 
+Reject the null hypothesis.
+*Conclusion*
+With 95% statistical confidence, there exist sufficient evidence to reject the claim that the interaction between diagnosis and sensitivity has similar effect.
+Post hoc LSD test reported Coliform mastitis:Gentamycin having the highest effect with mean (24.05882) implying that Coliform is highly susceptible to Gentamycin. No stattistical difference was obtained between Coliform mastitis:Tetracycline and Coliform mastitis:Cefalexin.
+Pseudomonas mastitis:Cotrimoxazole	offered the lowest effect with mean (12.25000)
+
+2. fact.A:fact.C 
+The two factor interaction for the diagnosis and breed reported a p-value of (0.571066). This is greater than alpha (0.05). 
+*Decision* 
+Fail to reject the null hypothesis.
+*Conclusion*
+With 95% statistical confidence, there exist sufficient statistical evidence to support the claim that the two factor interaction of diagnosis and breed have similar effects across all sets of combinations.
+
+3. fact.B:fact.C 
+The two factor interaction for the sensitivity and breed reported a p-value of (0.002284). This is less than alpha (0.05).
+*Decision* 
+Reject the null hypothesis.
+*Conclusion*
+With 95% statistical confidence, there exist sufficient statistical evidence to reject the claim that the two factor interaction of sensitivity and breed have similar effects across all sets of combinations.
+Post hoc analyses showed that Tetracycline:Jersey exhibited the highest effect with mean (26.14286) while Cotrimoxazole:Fresian exhibited the lowest effect with mean (14.71429)
+
+4. fact.A:fact.B:fact.C
+The three factor interaction reported a p-value of (0.256982). This greater than alpha (0.05).
+*Decision* 
+Fail to reject the null hypothesis.
+*Conclusion*
+With 95% statistical confidence, there exist sufficient statistical evidence to support the claim that the three factor interaction of diagnosis, sensitivity and breed have similar effects across all sets of combinations.
+
+### Interaction plot
+An interaction plot was generated to describe interaction between the two main factors; diagnosis and sensitivity.
+```{r}
+interaction.plot(x.factor= Mastistis_clean$Diagnosis,
+                 trace.factor=Mastistis_clean$Sensitivity_test,
+                 response= Mastistis_clean$Yield,
+                 type="b", 
+                 main="Interaction Between Diagnosis and Sensitivity Test",
+                 xlab="Diagnosis",
+                 ylab = "Zone of Inhibition in mm",
+                 col = c("red","blue", "green", "violet", "gold", "brown", "black", "orange"),
+                 lwd=3,
+                 trace.label = "Sensitivity Test")
+```
+
+### Interpretation
+Gentamycin had the highest effects of all the sensitivity tests. 
+Cotrimoxazole had the lowest effect. This could be attributed to high resistance of the pathogens to this anti-microbial agent.
+
+There was an interaction of anti-microbial agents at different zones of inhibition. 
+Cotrimoxazole and Kanamycin interacted at zone 17.
+Penicillin interacted with Kanamycin at zone 18 and Tetracycline at zone 17.
+Tetracyline interacted with Penicillin at zone 18, Kanamycin at zone 19, Streptomycin at zone 20. Neomycin at zone 21 and Cefalexin at zone 21.
+Gentamycin interacted with Neomycin at 21, Cefalexin at 21, Kanamycin at 20.
+
+Moving across the diagnosis the study found the following;
+Gentamycin had highest effect on Coliform mastitis and Staphylococcal mastitis. There was a drop in the trend in Pseudomonas Mastitis indicating some of resistance.
+There was a general negative trend moving from Coliform mastitis to Pseudomonas Mastitis and a positive trend moving towards Staphylococcal mastitis for the sensitivity tests; Gentamycin, Cotrimoxazole, Penicillin and Cefalexin
+Tetracycline and Streptomycin exhibited a negative trend moving across Coliform mastitis and Staphylococcal mastitis.
+Kanamycin and Neomycin had a positive trend moving from Coliform mastitis to Pseudomonas mastitis. The trend was however relatively stable moving from Pseudomonas Mastitis to Staphylococcal mastitis
+
+# Conclusion
+The factorial experiments are useful in that they allow us to analyze the effects of different factors simultaneously.
+The doebioresearch package contains numerous functions on how to analyze design of experiments data in biological research.
+Interaction plots visualize the interaction between to main factors. However, some may not clearly visualize the interaction. This does not mean that there are no interactions in the data.
+
+# References
+Montgomery, D. C. (2012). Design and analysis of experiments. New York: John Wiley.
+Gomes F, Henriques M. Control of bovine mastitis: old and recent therapeutic approaches. Curr Microbiol. 2016;72:377–82. doi: 10.1007/s00284-015-0958-8. [PubMed] (/https://pubmed.ncbi.nlm.nih.gov/26687332/)
+Agricultural Statistics. Factorial RBD Analysis in 1 line along with LSD test in R [YouTube Video] (/https://youtu.be/8D2AFA3Dt8U)
+
