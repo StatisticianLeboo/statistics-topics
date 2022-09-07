@@ -1,0 +1,97 @@
+---
+title: "Imputation"
+author: "Ian Leboo"
+date: '2022-09-01'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning=FALSE)
+```
+
+Load required Packages
+```{r}
+library(tidyverse)
+library(dplyr)
+library(mice)
+library(Hmisc)
+```
+
+Example 1
+Using the nhanes dataset within the Mice package
+```{r}
+data<-mice::nhanes
+str(data)
+```
+
+Convert the variables to the required type
+The data was collected from 25 infants aged 1-3 and their body mass index (bmi), cholesterol and hypertension levels recorded.
+Only hypertension level is not recorded in the desired type which is factor.
+```{r}
+data$hyp<- as.factor(data$hyp)
+```
+
+Previewing the Data
+```{r}
+describe(data)
+```
+
+Sum of missing values
+```{r}
+data %>% summarise_all(funs(sum(is.na(.))))
+```
+
+```{r}
+summary(data)
+```
+
+Mean, and Median imputation
+This imputation will only allow us to replace missing values for numeric data. Lets create duplicates for the data so as to not alter the data or be required to reattach the data
+```{r}
+mean_data=data
+median_data=data
+
+mean(mean_data$bmi, na.rm=TRUE) ## 26.5625
+mean(mean_data$chl, na.rm=TRUE) ## 191.4
+
+median(median_data$bmi, na.rm=TRUE) ## 26.75
+median(median_data$chl, na.rm=TRUE) ## 187
+summary(mean_data)
+summary(median_data)
+```
+
+# USING THE MICE PACKAGE 
+MICE stands for Multivariate Imputation by Chained Equations
+After checking for the summary statistics for the missing values, the mice package allows you to visualize the structure of missing values and possibly determine the method of imputation.
+```{r}
+md.pattern(data)
+```
+
+Using the mice package, you can impute data of any type by use of the corresponding method. 
+Syntax  and explanation
+
+### mice(data, m=5, method=NULL)
+
+
+```{r}
+methods(mice)
+```
+
+From the original data, we had missing values for bmi and chl in the numeric category and hyp for factor variables. 
+The method is stored in a vector as shown below. pmm is used to impute numeric values and logreg is used to impute categorical data. The first vector value is blank since no imputation is needed. If you are unsure justset the method to NULL, the algorithm will impute using the best fit values.
+```{r}
+imp_dat<-mice(data, m=5, method = c("", "pmm", "logreg", "pmm"))
+summary(imp_dat)
+```
+
+```{r}
+imp_dat$imp$hyp
+```
+
+Merge the data
+To fit in the missing data select one of the given values. You can choose the column you seem fit. Example you can use the mean as a reference point. i.e., select a column whose values look close to the mean. The complete function from tidyverse is used to merge the data
+```{r}
+clean_dat<-complete(imp_dat,2)
+```
+
+
