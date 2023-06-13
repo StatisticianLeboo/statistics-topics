@@ -1,0 +1,128 @@
+---
+title: "Causal Impact Analysis in R "
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+
+# Causal Impact Analysis
+
+Causal Impact Analysis is a statistical analysis used to measure the effect of an intervention (policy change).
+Through the analysis, we are able to answer the following questions:
+1. Did the intervention have significant impact on the outcome?
+2. How much of the observed change can be attributed to the intervention?
+
+Normally, when we want to assess these effects,  researchers design randomized control trials to investigate this. However, these experiments are sometimes expensive or unethical and therefore not suitable.
+
+## Application
+Impact analyses are applicable in diverse industries such as;
+1. Health: Impact of vaccinations to infectious disease cases, impact of lock downs, impact of new drugs
+2. Economics: Impact of policy changes to economic indicators such as interest rates, balance of trade, consumer price indices
+3. Marketing: Impact of campaigns and promotions to customer behaviours
+
+## Assumptions
+Like any other model, causal impact analysis are applicable under the assumptions
+
+1. Pre-intervention trend: The outcome variable should follow a stable trend before the intervention, allowing for a reliable counter-factual.
+2. Parallel trends: The treated and control groups should have similar trends before the intervention, ensuring that any observed differences in the post-intervention period are attributable to the treatment.
+3. Stationarity: The relationship between the control variables and the outcome should remain stable over time.
+
+# Implementation in R
+
+## Steps
+
+To perform Causal Impact analysis in R, you will need:
+1. Install the package *install.packages"CausalImpact"*
+2. The dataset should contain the following variables
+    a. Date
+    b. Variable of interest containing values whose effect we are interested to analyze
+    c. co-variate. This is any variable(s) that remain constant and are not directly impacted with the intervention
+3. Create time series objects for each of the variables i parts b and c
+4. Define the pre-intervention and post-intervention periods
+5. Create a zoo object for all the variable
+6. Perform the analysis
+
+
+## Importing the Data
+
+The data for this project is from the Central Bank of Kenya (CBK). It contains monthly interest rates set by the CBK, commercial bank interest rates for loans and deposits from June 2006 to October 2019.
+The Kenya gazette dated 31st August 2016 published the Section 33B of the Banking Act that had been introduced by the Banking (Amendment) Act, 2016. It provided for, among other things, a ceiling of 4% over the rate set by the Central Bank of Kenya on interest charged by financial institutions regulated under the Banking Act.
+This legislation saw Kenyans enjoy affordable interest rates and was abolished in October 2019 following the President’s recommendation to Parliament to repeal the interest rate cap law has sailed through Parliament, paving the way for the repeal of the law. 
+The President refused to assent to the Finance Bill, 2019 (the Finance Bill) and referred the Finance Bill back to Parliament with a memorandum outlining the reasons for his refusal. His concern was the presence of the interest rate cap and he recommended that it be abolished by repealing section 33B of the Banking Act.
+
+In this analysis, we assess the impact of this legislation. The variable of interest will be the difference between Commercial banks interest and CBK interest. 
+
+```{r}
+library(readxl)
+Banking_Rates <- read_excel("Banking Rates.xlsx")
+
+# Computing the diffrence in rates
+library(dplyr)
+Banking_Rates<-Banking_Rates %>% mutate(Month=as.Date(Month),
+                                       Rate_Diff = Commercial -`Central Bank`)
+```
+
+## Visualizing the Differnece in Rates
+
+```{r}
+library(ggplot2)
+library(scales)
+library(plotly)
+Rates_Plot<-ggplot(Banking_Rates) +
+  aes(x = Month, y = Rate_Diff) +
+  geom_line(colour = "#112446") +
+  labs(x = "Month", y = "% Difference",
+    title = "Interest Rates Difference Between Commercial Banks and Central Bank in Kenya",caption = "Data Source Central Bank of Kenya (CBK)") +
+  scale_x_date(date_labels = "%b-%y", date_breaks = "6 months")+
+  theme_bw() +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5), 
+        plot.caption = element_text(face = "italic"))
+
+Rates_Plot
+```
+
+
+### Adding interactivity
+```{r}
+Rateplot<-ggplotly(Rates_Plot) %>% layout(yaxis=list(fixedrange=TRUE),
+        xaxis=list(fixedrange=TRUE))%>%
+  config(displayModeBar=FALSE)
+
+# Saving the interactive plot
+htmlwidgets::saveWidget(as_widget(Rateplot), 'Rateplot.html')
+```
+
+## Preparing the Data for Impact Analysis
+```{r}
+# defining pre-intervention period
+pre_period<-as.Date(c("2006-06-01", "2016-08-01"))
+# defining post-intervention period
+post_period<-as.Date(c("2016-09-01", "2019-10-01" ))
+
+time_period = seq.Date(as.Date("2006-06-01"), as.Date("2019-10-01"), by = "1 month")
+
+# Creating the time series elements
+Rate_dif<- ts(Banking_Rates$Rate_Diff)
+Dep <- ts(Banking_Rates$Deposit)
+
+# Merging the data
+library(zoo)
+Dif_Rate<-zoo(cbind(Rate_dif, Dep), time_period)
+```
+
+
+## Causal Impact Analysis
+```{r}
+library(CausalImpact)
+impact <- CausalImpact(Dif_Rate, pre_period, post_period)
+# Summary
+summary(impact)
+```
+
+### Full Report
+```{r}
+summary(impact,"report")
+```

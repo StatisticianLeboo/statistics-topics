@@ -1,0 +1,53 @@
+---
+title: "Untitled"
+author: "Ian Leboo"
+date: "2023-05-19"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+```{r}
+library(janitor)
+library(tidyverse)
+library(dplyr)
+library(CausalImpact)
+library(readxl)
+library(zoo)
+library(plotly)
+rm(list = ls())
+Cholera <- read_excel("data01.xlsx") %>%
+  clean_names()
+
+Cholera<-Cholera %>% 
+  mutate(date_of_onset=as.Date(date_of_onset, format= "%Y-%m-%d"),
+                   vaccinated = as.numeric(vaccinated),
+         not_vaccinated = as.numeric(not_vaccinated))
+```
+
+
+```{r}
+vaccinated<-ts(Cholera$vaccinated)
+not_vaccinated<- ts(Cholera$not_vaccinated)
+period_dates <- seq.Date(as.Date("2022-11-15"), as.Date("2023-04-25") ,by = 1)
+
+data<- zoo(cbind(not_vaccinated, vaccinated), period_dates)
+
+pre.period<-as.Date(c("2022-11-15", "2023-02-11"))
+post.period<-as.Date(c("2023-02-12", "2023-04-25" ))
+
+impact <- CausalImpact(data, pre.period, post.period)
+plot(impact)
+```
+
+
+```{r}
+summary(impact)
+summary(impact, "report")
+```
+
+
